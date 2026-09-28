@@ -61,7 +61,7 @@ class EvidenceService(Service):
             )
             return self._material_dict(material)
 
-        return self.idempotent(idempotency_key, work)
+        return self.idempotent(actor, idempotency_key, work)
 
     # ------------------------------------------------------------ 上传版本
     def upload_version(
@@ -141,7 +141,7 @@ class EvidenceService(Service):
             )
             return self._version_dict(version)
 
-        return self.idempotent(idempotency_key, work)
+        return self.idempotent(actor, idempotency_key, work)
 
     # -------------------------------------------------------------- 撤回
     def withdraw_version(
@@ -175,7 +175,7 @@ class EvidenceService(Service):
             )
             return {"version_id": version_id, "withdrawn": True, "reason": reason}
 
-        return self.idempotent(idempotency_key, work)
+        return self.idempotent(actor, idempotency_key, work)
 
     def withdraw_material(
         self,
@@ -210,7 +210,7 @@ class EvidenceService(Service):
                 "replayed": material.withdrawn,
             }
 
-        return self.idempotent(idempotency_key, work)
+        return self.idempotent(actor, idempotency_key, work)
 
     # ------------------------------------------------------------- 查询
     def get_material(self, actor: User, material_id: str) -> dict:

@@ -126,7 +126,7 @@ class ReviewService(Service):
             )
             return self._request_dict(request)
 
-        return self.idempotent(idempotency_key, work)
+        return self.idempotent(actor, idempotency_key, work)
 
     def cancel_request(
         self,
@@ -160,7 +160,7 @@ class ReviewService(Service):
             )
             return self._request_dict(req)
 
-        return self.idempotent(idempotency_key, work)
+        return self.idempotent(actor, idempotency_key, work)
 
     # ------------------------------------------------------------- 响应
     def respond_assignment(
@@ -195,7 +195,7 @@ class ReviewService(Service):
             )
             return self._request_dict(req)
 
-        return self.idempotent(idempotency_key, work)
+        return self.idempotent(actor, idempotency_key, work)
 
     def record_objection(
         self,
@@ -242,7 +242,7 @@ class ReviewService(Service):
                 "created_at": objection.created_at,
             }
 
-        return self.idempotent(idempotency_key, work)
+        return self.idempotent(actor, idempotency_key, work)
 
     def submit_verdict(
         self,
@@ -285,7 +285,7 @@ class ReviewService(Service):
             )
             return self._request_dict(req)
 
-        return self.idempotent(idempotency_key, work)
+        return self.idempotent(actor, idempotency_key, work)
 
     # --------------------------------------------------------------- 签发
     def issue_decision(
@@ -396,7 +396,7 @@ class ReviewService(Service):
                 "review_fingerprint": decided.review_fingerprint,
             }
 
-        return self.idempotent(idempotency_key, work)
+        return self.idempotent(actor, idempotency_key, work)
 
     # --------------------------------------------------------------- 查询
     def list_requests(self, actor: User, package_id: str) -> list[dict]:

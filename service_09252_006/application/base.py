@@ -61,23 +61,28 @@ class Service:
             )
         )
 
-    def idempotent(self, key: str | None, work: Callable[[], dict]) -> dict:
-        """在单个写事务内执行 work，并按 key 记录结果。
+    def idempotent(
+        self, actor: User, key: str | None, work: Callable[[], dict]
+    ) -> dict:
+        """在单个写事务内执行 work，并按 (用户, key) 记录结果。
 
+        - 幂等结果按用户隔离：只回放同一 actor 首次成功的响应，
+          其他用户使用相同 key 得到独立结果，绝不跨用户回放；
         - key 已存在：直接回放首次结果（不重复执行）；
         - key 为空：不做幂等记录；
         - work 抛错则整体回滚，调用方用同一 key 重试是安全的（可恢复）。
         """
+        require_user(actor)
         if key is None:
             with self.repo.transaction():
                 return work()
         with self.repo.transaction():
-            prior = self.repo.get_idempotent_result(key)
+            prior = self.repo.get_idempotent_result(actor.user_id, key)
             if prior is not None:
                 prior["replayed"] = True
                 return prior
             result = work()
             result.setdefault("replayed", False)
             stored = dict(result)
-            self.repo.save_idempotent_result(key, stored)
+            self.repo.save_idempotent_result(actor.user_id, key, stored)
             return result

@@ -44,12 +44,14 @@ class Repository(abc.ABC):
     @abc.abstractmethod
     def get_user_by_token(self, token: str) -> User | None: ...
 
-    # ---- 幂等键 ----
+    # ---- 幂等键（按用户隔离：同一 key 不同用户互不影响）----
     @abc.abstractmethod
-    def get_idempotent_result(self, key: str) -> dict | None: ...
+    def get_idempotent_result(self, user_id: str, key: str) -> dict | None: ...
 
     @abc.abstractmethod
-    def save_idempotent_result(self, key: str, result: dict) -> None: ...
+    def save_idempotent_result(
+        self, user_id: str, key: str, result: dict
+    ) -> None: ...
 
     # ---- 材料与版本 ----
     @abc.abstractmethod

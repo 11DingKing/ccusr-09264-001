@@ -27,7 +27,7 @@ from ..domain.models import (
     User,
 )
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 class SqliteRepository(Repository):
@@ -50,6 +50,31 @@ class SqliteRepository(Repository):
     def _ensure_schema(self) -> None:
         version = self._conn.execute("PRAGMA user_version").fetchone()[0]
         if version >= SCHEMA_VERSION:
+            return
+        if version == 1:
+            # v1 的幂等记录以 idempotency_key 为全局主键，会跨用户回放。
+            # 重建为按用户隔离：旧记录归属置空（NULL），不再命中任何真实用户。
+            self._conn.executescript(
+                """
+                    CREATE TABLE idempotency_v2 (
+                        idempotency_key TEXT NOT NULL,
+                        user_id          TEXT,
+                        result_json      TEXT NOT NULL,
+                        created_at       TEXT NOT NULL
+                    );
+                    INSERT INTO idempotency_v2(
+                        idempotency_key, user_id, result_json, created_at
+                    )
+                    SELECT idempotency_key, NULL, result_json, created_at
+                    FROM idempotency;
+                    DROP TABLE idempotency;
+                    ALTER TABLE idempotency_v2 RENAME TO idempotency;
+                    CREATE UNIQUE INDEX idx_idempotency_user_key
+                        ON idempotency(user_id, idempotency_key);
+
+                    PRAGMA user_version = 2;
+                """
+            )
             return
         # executescript 会自行提交事务；把 user_version 写入放在同一脚本
         self._conn.executescript(
@@ -165,10 +190,13 @@ class SqliteRepository(Repository):
                 );
 
                 CREATE TABLE IF NOT EXISTS idempotency (
-                    idempotency_key TEXT PRIMARY KEY,
+                    idempotency_key TEXT NOT NULL,
+                    user_id          TEXT,
                     result_json     TEXT NOT NULL,
                     created_at      TEXT NOT NULL
                 );
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_idempotency_user_key
+                    ON idempotency(user_id, idempotency_key);
 
                 CREATE TABLE IF NOT EXISTS api_tokens (
                     token       TEXT PRIMARY KEY,
@@ -176,7 +204,7 @@ class SqliteRepository(Repository):
                     created_at  TEXT NOT NULL
                 );
 
-                PRAGMA user_version = 1;
+                PRAGMA user_version = 2;
             """
         )
 
@@ -256,18 +284,21 @@ class SqliteRepository(Repository):
         return None if row is None else _row_to_user(row)
 
     # ------------------------------------------------------------ idempotency
-    def get_idempotent_result(self, key: str) -> dict | None:
+    def get_idempotent_result(self, user_id: str, key: str) -> dict | None:
         row = self._conn.execute(
-            "SELECT result_json FROM idempotency WHERE idempotency_key = ?",
-            (key,),
+            "SELECT result_json FROM idempotency"
+            " WHERE user_id = ? AND idempotency_key = ?",
+            (user_id, key),
         ).fetchone()
         return None if row is None else json.loads(row["result_json"])
 
-    def save_idempotent_result(self, key: str, result: dict) -> None:
+    def save_idempotent_result(
+        self, user_id: str, key: str, result: dict
+    ) -> None:
         self._conn.execute(
-            "INSERT OR IGNORE INTO idempotency(idempotency_key, result_json, created_at)"
-            " VALUES(?,?,?)",
-            (key, json.dumps(result, ensure_ascii=False), ""),
+            "INSERT OR IGNORE INTO idempotency(idempotency_key, user_id,"
+            " result_json, created_at) VALUES(?,?,?,?)",
+            (key, user_id, json.dumps(result, ensure_ascii=False), ""),
         )
 
     # ------------------------------------------------------------- materials

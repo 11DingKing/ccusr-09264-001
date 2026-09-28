@@ -87,7 +87,7 @@ class PackageService(Service):
             )
             return self._package_dict(self.repo.get_package(pid))
 
-        return self.idempotent(idempotency_key, work)
+        return self.idempotent(actor, idempotency_key, work)
 
     def _copy_live_entries(self, actor: User, predecessor: ReviewPackage, new_pid: str) -> int:
         count = 0
@@ -159,7 +159,7 @@ class PackageService(Service):
             )
             return {"package_id": package_id, "version_id": version_id, "entry_id": entry.entry_id}
 
-        return self.idempotent(idempotency_key, work)
+        return self.idempotent(actor, idempotency_key, work)
 
     def seal_package(
         self,
@@ -237,7 +237,7 @@ class PackageService(Service):
             )
             return self._package_dict(sealed)
 
-        return self.idempotent(idempotency_key, work)
+        return self.idempotent(actor, idempotency_key, work)
 
     # -------------------------------------------------------------- 视图
     def build_package_view(self, actor: User, package_id: str) -> dict:
